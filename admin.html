@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Admin — Yora</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,10 +51,12 @@
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
     transition: transform 0.3s;
   }
-  .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  /* FIX: Mobile sidebar hidden by default */
+  .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; }
   .sidebar-logo a { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--white); text-decoration: none; }
   .sidebar-logo a span { color: var(--saffron); }
   .sidebar-logo .admin-tag { font-size: 10px; font-weight: 700; background: rgba(232,131,10,0.2); color: var(--saffron); padding: 2px 8px; border-radius: 50px; margin-left: 8px; letter-spacing: 0.5px; }
+  .close-sidebar-btn { background: rgba(255,255,255,0.1); border: none; color: white; font-size: 16px; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
   .nav-section-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 1px; padding: 0 8px; margin-bottom: 6px; margin-top: 16px; }
   .nav-section-label:first-child { margin-top: 0; }
@@ -80,9 +82,11 @@
   /* MAIN */
   .main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
 
-  /* TOP BAR */
-  .topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: sticky; top: 0; z-index: 50; }
-  .topbar-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--dark); }
+  /* TOP BAR - FIX: Added menu toggle button */
+  .topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: sticky; top: 0; z-index: 50; gap: 12px; }
+  .menu-toggle { display: none; background: var(--cream); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+  .menu-toggle:hover { background: var(--saffron-light); border-color: var(--saffron); }
+  .topbar-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--dark); flex: 1; }
   .topbar-actions { display: flex; align-items: center; gap: 10px; }
   .btn-primary { background: var(--saffron); color: white; border: none; border-radius: 10px; font-family: var(--font-body); font-size: 13px; font-weight: 700; padding: 9px 18px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
   .btn-primary:hover { background: var(--saffron-dark); transform: translateY(-1px); }
@@ -199,7 +203,19 @@
   .toast.success { background: var(--green); }
   .toast.error   { background: var(--red); }
 
-  /* RESPONSIVE */
+  /* FIX: RESPONSIVE - MOBILE SIDEBAR */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+    display: none;
+    backdrop-filter: blur(2px);
+  }
+  .sidebar-overlay.show {
+    display: block;
+  }
+  
   @media (max-width: 900px) {
     .sidebar { transform: translateX(-100%); }
     .sidebar.open { transform: translateX(0); }
@@ -207,11 +223,13 @@
     .stats-row { grid-template-columns: 1fr 1fr; }
     .content { padding: 20px 16px; }
     .topbar { padding: 0 16px; }
+    .menu-toggle { display: flex; }
   }
   @media (max-width: 600px) {
     .stats-row { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .form-field.span2 { grid-column: span 1; }
+    .toast { white-space: normal; text-align: center; width: 90%; left: 5%; transform: none; }
   }
 
   /* ADMIN LOGIN SCREEN */
@@ -250,6 +268,8 @@
 </head>
 <body>
 
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <!-- ADMIN LOGIN SCREEN -->
 <div class="admin-login-screen" id="adminLoginScreen">
@@ -299,6 +319,7 @@
     <div class="sidebar-logo">
       <a href="index.html">Yora<span>.</span></a>
       <span class="admin-tag">ADMIN</span>
+      <button class="close-sidebar-btn" onclick="closeSidebar()">✕</button>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">Overview</div>
@@ -336,12 +357,12 @@
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
       <div class="topbar-title" id="topbarTitle">Dashboard</div>
       <div class="topbar-actions" id="topbarActions"></div>
     </div>
 
     <div class="content">
-
       <!-- ── OVERVIEW ── -->
       <div class="panel active" id="panel-overview">
         <div class="stats-row">
@@ -611,6 +632,17 @@
 
   let sb, allBiz = [], allProducts = [], editingBizId = null, editingProdId = null;
 
+  // ── SIDEBAR MOBILE FUNCTIONS ──
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+  }
+
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+  }
+
   // ── TOAST ──
   function toast(msg, type = '') {
     const el = document.getElementById('toast');
@@ -623,7 +655,7 @@
   function openModal(id)  { document.getElementById(id).classList.add('open'); document.body.style.overflow = 'hidden'; }
   function closeModal(id) { document.getElementById(id).classList.remove('open'); document.body.style.overflow = ''; }
 
-  // ── PANEL SWITCHER ──
+  // ── PANEL SWITCHER (with auto-close sidebar on mobile) ──
   function switchPanel(name, btn) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -632,6 +664,10 @@
     const titles = { overview: 'Dashboard', businesses: 'Businesses', products: 'Products', orders: 'Orders', customers: 'Customers' };
     document.getElementById('topbarTitle').textContent = titles[name] || name;
     updateTopbarActions(name);
+    // Auto close sidebar on mobile after navigation
+    if (window.innerWidth <= 900) {
+      closeSidebar();
+    }
   }
 
   function updateTopbarActions(panel) {
@@ -707,7 +743,7 @@
     if (!list.length) { body.innerHTML = '<tr class="empty-row"><td colspan="6">No businesses found</td></tr>'; return; }
     body.innerHTML = list.map(b => `
       <tr>
-        <td><div class="biz-cell"><div class="biz-emoji-sm">${b.logo_emoji || '🏪'}</div><div><div style="font-weight:600;">${b.name}</div><div style="font-size:11px;color:var(--muted);">${b.address || '—'}</div></div></div></td>
+        <td><div class="biz-cell"><div class="biz-emoji-sm">${b.logo_emoji || '🏪'}</div><div><div style="font-weight:600;">${escapeHtml(b.name)}</div><div style="font-size:11px;color:var(--muted);">${b.address || '—'}</div></div></div></td>
         <td><span class="badge ${b.category === 'restaurant' ? 'orange' : b.category === 'pharmacy' ? 'green' : 'blue'}">${b.category}</span></td>
         <td style="font-size:12px;color:var(--muted);">${b.whatsapp_number || '—'}</td>
         <td><span class="badge ${b.is_approved ? 'green' : 'gray'}">${b.is_approved ? '✓ Approved' : 'Pending'}</span></td>
@@ -715,9 +751,19 @@
         <td><div class="actions-cell">
           ${!b.is_approved ? `<button class="action-btn approve" onclick="approveBusiness('${b.id}')">Approve</button>` : ''}
           <button class="action-btn" onclick="openEditBusiness('${b.id}')">Edit</button>
-          <button class="action-btn danger" onclick="deleteBusiness('${b.id}', '${b.name.replace(/'/g, "\\'")}')">Delete</button>
+          <button class="action-btn danger" onclick="deleteBusiness('${b.id}', '${escapeHtml(b.name).replace(/'/g, "\\'")}')">Delete</button>
         </div></td>
       </tr>`).join('');
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
   }
 
   function filterBusinesses() {
@@ -746,7 +792,7 @@
     document.getElementById('bizCloseTime').value  = '22:00';
     document.getElementById('bizApproved').checked = true;
     document.getElementById('bizIsOpen').checked   = true;
-    removeCover(); // reset image state
+    removeCover();
     openModal('bizModal');
   }
 
@@ -769,7 +815,6 @@
     document.getElementById('bizApproved').checked  = biz.is_approved;
     document.getElementById('bizIsOpen').checked    = biz.is_open;
 
-    // Reset cover image state
     coverImageUrl = biz.cover_image_url || null;
     document.getElementById('bizCoverFile').value = '';
     document.getElementById('coverUploading').classList.remove('show');
@@ -797,10 +842,7 @@
     btn.disabled = true;
     document.getElementById('bizSaveSpinner').style.display = 'block';
 
-    // Determine business ID for image path
     const targetId = editingBizId || crypto.randomUUID();
-
-    // Upload cover image if one was selected
     const uploadedUrl = await uploadCoverImage(targetId);
 
     const payload = {
@@ -823,7 +865,6 @@
     if (editingBizId) {
       ({ error } = await sb.from('businesses').update(payload).eq('id', editingBizId));
     } else {
-      // Insert with the pre-generated ID so image path matches
       ({ error } = await sb.from('businesses').insert({ ...payload, id: targetId }));
     }
 
@@ -865,14 +906,14 @@
     if (!list.length) { body.innerHTML = '<tr class="empty-row"><td colspan="6">No products found</td></tr>'; return; }
     body.innerHTML = list.map(p => `
       <tr>
-        <td><div class="biz-cell"><div class="biz-emoji-sm">${p.emoji || '🍛'}</div><div style="font-weight:600;">${p.name}</div></div></td>
+        <td><div class="biz-cell"><div class="biz-emoji-sm">${p.emoji || '🍛'}</div><div style="font-weight:600;">${escapeHtml(p.name)}</div></div></td>
         <td style="font-size:12px;color:var(--muted);">${p.businesses?.name || '—'}</td>
         <td style="font-size:12px;">${p.category || '—'}</td>
         <td style="font-weight:700;">₦${Number(p.price).toLocaleString()}</td>
         <td><span class="badge ${p.is_available ? 'green' : 'gray'}">${p.is_available ? 'Yes' : 'No'}</span></td>
         <td><div class="actions-cell">
           <button class="action-btn" onclick="openEditProduct('${p.id}')">Edit</button>
-          <button class="action-btn danger" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">Delete</button>
+          <button class="action-btn danger" onclick="deleteProduct('${p.id}', '${escapeHtml(p.name).replace(/'/g, "\\'")}')">Delete</button>
         </div></td>
       </tr>`).join('');
   }
@@ -985,16 +1026,11 @@
   // ── LOAD CUSTOMERS ──
   async function loadCustomers() {
     const body = document.getElementById('customersTableBody');
-
-    // Try profiles table first
-    const { data, error } = await sb
-      .from('profiles')
-      .select('*')
-      .order('updated_at', { ascending: false });
+    const { data, error } = await sb.from('profiles').select('*').order('updated_at', { ascending: false });
 
     if (error) {
       console.error('Customers load error:', error.message);
-      body.innerHTML = '<tr class="empty-row"><td colspan="4">Could not load customers — check Supabase RLS policies on the profiles table.</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="4">Could not load customers — check RLS policies</td></tr>';
       return;
     }
 
@@ -1003,7 +1039,6 @@
       return;
     }
 
-    // Update overview count too
     const ovEl = document.getElementById('ovCustomers');
     if (ovEl) ovEl.textContent = data.length;
 
@@ -1016,42 +1051,19 @@
       const isAdmin = c.is_admin ? '<span class="badge orange" style="margin-left:6px;">Admin</span>' : '';
       return '<tr>' +
         '<td><div class="biz-cell"><div style="background:var(--saffron);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;width:32px;height:32px;border-radius:50%;flex-shrink:0;">' + initial + '</div>' +
-        '<div><div style="font-weight:600;">' + name + '</div>' + isAdmin + '</div></div></td>' +
-        '<td style="font-size:13px;">' + email + '</td>' +
-        '<td style="font-size:13px;">' + phone + '</td>' +
+        '<div><div style="font-weight:600;">' + escapeHtml(name) + '</div>' + isAdmin + '</div></div></td>' +
+        '<td style="font-size:13px;">' + escapeHtml(email) + '</td>' +
+        '<td style="font-size:13px;">' + escapeHtml(phone) + '</td>' +
         '<td style="font-size:12px;color:var(--muted);">' + joined + '</td>' +
         '</tr>';
     }).join('');
   }
 
-  // ── ADMIN EMAILS — add yours here ──
-  const ADMIN_EMAILS = [
-    'mahmud.umar.ramadan@gmail.com', // ← replace with your actual email
-  ];
-
-  // ── INIT ──
-  window.addEventListener('DOMContentLoaded', async () => {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const { data: { session } } = await sb.auth.getSession();
-
-    if (!session) {
-      document.getElementById('pageLoader').classList.add('hide');
-      document.getElementById('adminLoginScreen').classList.add('show');
-      return;
-    }
-
-    if (!ADMIN_EMAILS.includes(session.user.email)) {
-      document.getElementById('pageLoader').classList.add('hide');
-      document.getElementById('accessDenied').classList.add('show');
-      return;
-    }
-
-    await initDashboard(session);
-  });
+  // ── ADMIN EMAILS ──
+  const ADMIN_EMAILS = ['mahmud.umar.ramadan@gmail.com'];
 
   // ── IMAGE UPLOAD ──
-  let coverImageUrl = null; // holds uploaded URL during modal session
+  let coverImageUrl = null;
 
   function previewCover(input) {
     const file = input.files[0];
@@ -1083,26 +1095,23 @@
   async function uploadCoverImage(businessId) {
     const fileInput = document.getElementById('bizCoverFile');
     const file = fileInput.files[0];
-    if (!file) return coverImageUrl; // return existing URL if no new file
+    if (!file) return coverImageUrl;
 
     document.getElementById('coverUploading').classList.add('show');
-
-    const ext      = file.name.split('.').pop();
-    const path     = 'covers/' + businessId + '-' + Date.now() + '.' + ext;
+    const ext = file.name.split('.').pop();
+    const path = 'covers/' + businessId + '-' + Date.now() + '.' + ext;
     const { error } = await sb.storage.from('business-images').upload(path, file, { upsert: true });
-
     document.getElementById('coverUploading').classList.remove('show');
 
     if (error) {
-      console.error('Image upload error:', error.message);
       toast('Image upload failed: ' + error.message, 'error');
       return null;
     }
-
     const { data } = sb.storage.from('business-images').getPublicUrl(path);
     return data.publicUrl;
   }
 
+  // ── INIT DASHBOARD ──
   async function initDashboard(session) {
     const meta = session.user.user_metadata || {};
     const name = meta.full_name || meta.first_name || session.user.email.split('@')[0];
@@ -1142,6 +1151,26 @@
     document.getElementById('pageLoader').classList.remove('hide');
     await initDashboard(data.session);
   }
+
+  // ── EVENT LISTENERS ──
+  window.addEventListener('DOMContentLoaded', async () => {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: { session } } = await sb.auth.getSession();
+
+    if (!session) {
+      document.getElementById('pageLoader').classList.add('hide');
+      document.getElementById('adminLoginScreen').classList.add('show');
+      return;
+    }
+
+    if (!ADMIN_EMAILS.includes(session.user.email)) {
+      document.getElementById('pageLoader').classList.add('hide');
+      document.getElementById('accessDenied').classList.add('show');
+      return;
+    }
+
+    await initDashboard(session);
+  });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.getElementById('adminLoginScreen').classList.contains('show')) {
