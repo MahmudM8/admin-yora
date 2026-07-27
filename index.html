@@ -555,15 +555,16 @@
     if (cat!=='restaurant') document.getElementById('bizReservationsEnabled').checked = false;
   }
 
-  // ── OVERVIEW ──
+  // ── OVERVIEW (FIXED FOR STORE ORDERS) ──
   async function loadOverview() {
     const [{ count: bizCount },{ count: approvedCount },{ count: orderCount },{ count: custCount },{ data: recentOrders }] = await Promise.all([
       sb.from('businesses').select('*',{count:'exact',head:true}),
       sb.from('businesses').select('*',{count:'exact',head:true}).eq('is_approved',true),
       sb.from('orders').select('*',{count:'exact',head:true}),
       sb.from('profiles').select('*',{count:'exact',head:true}),
-      sb.from('orders').select('*').order('created_at',{ascending:false}).limit(8),
+      sb.from('orders').select('*').order('created_at',{ascending:false}).limit(10),
     ]);
+    
     document.getElementById('ovBiz').textContent       = bizCount??'—';
     document.getElementById('ovApproved').textContent  = approvedCount??'—';
     document.getElementById('ovOrders').textContent    = orderCount??'—';
@@ -573,16 +574,33 @@
     document.getElementById('ovStores').textContent = storeCount??'—';
 
     const body = document.getElementById('recentOrdersBody');
-    if (!recentOrders?.length) { body.innerHTML='<tr class="empty-row"><td colspan="5">No orders yet</td></tr>'; return; }
+    if (!recentOrders?.length) { 
+      body.innerHTML='<tr class="empty-row"><td colspan="5">No orders yet</td></tr>'; 
+      return; 
+    }
+    
     const badgeMap = {restaurant:'orange',pharmacy:'green',store:'purple',delivery:'blue'};
+    
     body.innerHTML = recentOrders.map(o => {
-      const itemsDisplay = Array.isArray(o.items) ? o.items.map(i => i.name+' x'+i.qty).join(', ') : '—';
+      // Format items display
+      let itemsDisplay = '—';
+      if (Array.isArray(o.items) && o.items.length) {
+        itemsDisplay = o.items.map(i => `${i.name} x${i.qty}`).join(', ');
+        if (itemsDisplay.length > 40) itemsDisplay = itemsDisplay.slice(0, 40) + '…';
+      }
+      
+      // Show store subcategory if applicable
+      let categoryDisplay = o.category || '—';
+      if (o.category === 'store' && o.store_category) {
+        categoryDisplay = `store (${o.store_category})`;
+      }
+      
       return '<tr>'+
-        '<td style="font-weight:600;">'+(o.business_name||'—')+'</td>'+
-        '<td><span class="badge '+(badgeMap[o.category]||'gray')+'">'+(o.category||'—')+'</span></td>'+
-        '<td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(itemsDisplay)+'">'+escapeHtml(itemsDisplay)+'</td>'+
-        '<td style="font-weight:700;">₦'+(o.total||0).toLocaleString()+'</td>'+
-        '<td style="font-size:12px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-NG')+'</td></tr>';
+        '<td style="font-weight:600;">' + escapeHtml(o.business_name || '—') + '</td>'+
+        '<td><span class="badge ' + (badgeMap[o.category] || 'gray') + '">' + escapeHtml(categoryDisplay) + '</span></td>'+
+        '<td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(itemsDisplay) + '">' + escapeHtml(itemsDisplay) + '</td>'+
+        '<td style="font-weight:700;">₦' + (o.total || 0).toLocaleString() + '</td>'+
+        '<td style="font-size:12px;color:var(--muted);">' + new Date(o.created_at).toLocaleString('en-NG') + '</td></tr>';
     }).join('');
   }
 
@@ -1089,6 +1107,9 @@
     document.getElementById('pageLoader').classList.add('hide');
     document.getElementById('app').style.display='flex';
     updateTopbarActions('overview');
+    
+    // Trigger order filter after load
+    setTimeout(filterOrders, 500);
   }
 
   async function handleAdminLogin() {
