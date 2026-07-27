@@ -288,7 +288,7 @@
         </div>
         <div class="table-card">
           <div class="table-card-header"><div class="table-card-title">Recent orders</div></div>
-          <div class="table-scroll"><table><thead><tr><th>Business</th><th>Category</th><th>Total</th><th>Date</th></tr></thead><tbody id="recentOrdersBody"></tbody></table></div>
+          <div class="table-scroll"><table><thead><tr><th>Business</th><th>Category</th><th>Items</th><th>Total</th><th>Date</th></tr></thead><tbody id="recentOrdersBody"></tbody></table></div>
         </div>
       </div>
 
@@ -341,8 +341,34 @@
       <!-- ORDERS -->
       <div class="panel" id="panel-orders">
         <div class="table-card">
-          <div class="table-card-header"><div class="table-card-title">All orders</div></div>
-          <div class="table-scroll"><table><thead><tr><th>Business</th><th>Category</th><th>Items</th><th>Total</th><th>Address</th><th>Date</th></tr></thead><tbody id="ordersTableBody"></tbody></table></div>
+          <div class="table-card-header">
+            <div class="table-card-title">All orders</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select class="filter-select" id="orderCategoryFilter" onchange="filterOrders()">
+                <option value="all">All categories</option>
+                <option value="restaurant">Restaurants</option>
+                <option value="pharmacy">Pharmacies</option>
+                <option value="store">Stores</option>
+                <option value="delivery">Delivery</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Business</th>
+                  <th>Category</th>
+                  <th>Items</th>
+                  <th>Total</th>
+                  <th>Address</th>
+                  <th>Customer</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -502,6 +528,12 @@
     const titles = {overview:'Dashboard',businesses:'Businesses',products:'Products',orders:'Orders',customers:'Customers'};
     document.getElementById('topbarTitle').textContent = titles[name]||name;
     updateTopbarActions(name);
+    
+    // Load orders when switching to orders panel
+    if (name === 'orders') {
+      loadOrders();
+    }
+    
     if (window.innerWidth <= 900) closeSidebar();
   }
 
@@ -517,10 +549,8 @@
   // ── CATEGORY CHANGE ──
   function onCategoryChange() {
     const cat = document.getElementById('bizCategory').value;
-    // Store type field
     document.getElementById('storeCategoryField').style.display = cat==='store' ? 'block' : 'none';
     if (cat!=='store') document.getElementById('bizStoreCategory').value = '';
-    // Reservations (restaurants only)
     document.getElementById('reservationToggleRow').style.display = cat==='restaurant' ? 'flex' : 'none';
     if (cat!=='restaurant') document.getElementById('bizReservationsEnabled').checked = false;
   }
@@ -543,14 +573,17 @@
     document.getElementById('ovStores').textContent = storeCount??'—';
 
     const body = document.getElementById('recentOrdersBody');
-    if (!recentOrders?.length) { body.innerHTML='<tr class="empty-row"><td colspan="4">No orders yet</td></tr>'; return; }
+    if (!recentOrders?.length) { body.innerHTML='<tr class="empty-row"><td colspan="5">No orders yet</td></tr>'; return; }
     const badgeMap = {restaurant:'orange',pharmacy:'green',store:'purple',delivery:'blue'};
-    body.innerHTML = recentOrders.map(o =>
-      '<tr><td style="font-weight:600;">'+(o.business_name||'—')+'</td>'+
-      '<td><span class="badge '+(badgeMap[o.category]||'gray')+'">'+(o.category||'—')+'</span></td>'+
-      '<td style="font-weight:700;">₦'+(o.total||0).toLocaleString()+'</td>'+
-      '<td style="font-size:12px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-NG')+'</td></tr>'
-    ).join('');
+    body.innerHTML = recentOrders.map(o => {
+      const itemsDisplay = Array.isArray(o.items) ? o.items.map(i => i.name+' x'+i.qty).join(', ') : '—';
+      return '<tr>'+
+        '<td style="font-weight:600;">'+(o.business_name||'—')+'</td>'+
+        '<td><span class="badge '+(badgeMap[o.category]||'gray')+'">'+(o.category||'—')+'</span></td>'+
+        '<td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(itemsDisplay)+'">'+escapeHtml(itemsDisplay)+'</td>'+
+        '<td style="font-weight:700;">₦'+(o.total||0).toLocaleString()+'</td>'+
+        '<td style="font-size:12px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-NG')+'</td></tr>';
+    }).join('');
   }
 
   // ── BUSINESSES ──
@@ -686,8 +719,6 @@
     const btn = document.getElementById('bizSaveBtn');
     btn.disabled=true; document.getElementById('bizSaveSpinner').style.display='block';
 
-    // ── KEY FIX: for new businesses, insert WITHOUT id so Supabase generates it,
-    //    then upload the cover image using the returned id ──
     const payload = {
       name, category,
       store_category:   document.getElementById('bizStoreCategory').value||null,
@@ -697,7 +728,7 @@
       rating:           parseFloat(document.getElementById('bizRating').value)||null,
       logo_emoji:       document.getElementById('bizLogoEmoji').value.trim()||'🏪',
       cover_emoji:      document.getElementById('bizCoverEmoji').value.trim()||'🛍️',
-      cover_image_url:  coverImageUrl||null,  // existing URL for edits; new uploads handled below
+      cover_image_url:  coverImageUrl||null,
       opening_time:     document.getElementById('bizOpenTime').value||null,
       closing_time:     document.getElementById('bizCloseTime').value||null,
       is_approved:      document.getElementById('bizApproved').checked,
@@ -711,19 +742,16 @@
     let error, savedId;
 
     if (editingBizId) {
-      // EDIT: upload image first using existing ID, then update
       const uploadedUrl = await uploadCoverImage(editingBizId);
       if (uploadedUrl) payload.cover_image_url = uploadedUrl;
       ({ error } = await sb.from('businesses').update(payload).eq('id', editingBizId));
       savedId = editingBizId;
     } else {
-      // INSERT: let Supabase generate the ID, then upload image and update
       const { data: inserted, error: insertError } = await sb
         .from('businesses').insert(payload).select('id').single();
       error = insertError;
       if (!error && inserted) {
         savedId = inserted.id;
-        // Now upload image using the real DB-generated ID
         const uploadedUrl = await uploadCoverImage(savedId);
         if (uploadedUrl) {
           await sb.from('businesses').update({ cover_image_url: uploadedUrl }).eq('id', savedId);
@@ -882,21 +910,89 @@
     toast('Product deleted','success'); loadProducts();
   }
 
-  // ── ORDERS ──
+  // ── ORDERS (FIXED FOR STORE ORDERS) ──
   async function loadOrders() {
-    const { data } = await sb.from('orders').select('*').order('created_at',{ascending:false});
+    const { data, error } = await sb
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
     const body = document.getElementById('ordersTableBody');
-    if (!data?.length) { body.innerHTML='<tr class="empty-row"><td colspan="6">No orders yet</td></tr>'; return; }
+    
+    if (error) {
+      console.error('Orders error:', error);
+      body.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading orders</td></tr>';
+      return;
+    }
+    
+    if (!data?.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="7">No orders yet</td></tr>';
+      return;
+    }
+    
+    // Get customer names for orders without user_name
+    const userIds = data.filter(o => o.user_id && !o.user_name).map(o => o.user_id);
+    let userNames = {};
+    if (userIds.length) {
+      const { data: users } = await sb
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      if (users) {
+        users.forEach(u => { userNames[u.id] = u.full_name; });
+      }
+    }
+    
+    const badgeMap = {
+      restaurant: 'orange',
+      pharmacy: 'green',
+      store: 'purple',
+      delivery: 'blue'
+    };
+    
     body.innerHTML = data.map(o => {
-      const items = Array.isArray(o.items)?o.items.map(i=>i.name+' x'+i.qty).join(', '):'—';
-      return '<tr>'+
-        '<td style="font-weight:600;">'+(o.business_name||'—')+'</td>'+
-        '<td><span class="badge '+getCatBadge(o.category)+'">'+(o.category||'—')+'</span></td>'+
-        '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+items+'">'+items+'</td>'+
-        '<td style="font-weight:700;">₦'+(o.total||0).toLocaleString()+'</td>'+
-        '<td style="font-size:12px;color:var(--muted);">'+(o.address||'—')+'</td>'+
-        '<td style="font-size:12px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-NG')+'</td></tr>';
+      // Get customer name
+      const customerName = o.user_name || userNames[o.user_id] || o.user_email?.split('@')[0] || 'Guest';
+      
+      // Format items
+      let itemsDisplay = '—';
+      if (Array.isArray(o.items) && o.items.length) {
+        itemsDisplay = o.items.map(i => `${i.name} x${i.qty}`).join(', ');
+        if (itemsDisplay.length > 50) itemsDisplay = itemsDisplay.slice(0, 50) + '…';
+      }
+      
+      // Show store category for store orders
+      const categoryDisplay = o.category === 'store' && o.store_category 
+        ? `store (${o.store_category})` 
+        : o.category || '—';
+      
+      return '<tr>' +
+        '<td style="font-weight:600;">' + escapeHtml(o.business_name || '—') + '</td>' +
+        '<td><span class="badge ' + (badgeMap[o.category] || 'gray') + '">' + escapeHtml(categoryDisplay) + '</span></td>' +
+        '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(itemsDisplay) + '">' + escapeHtml(itemsDisplay) + '</td>' +
+        '<td style="font-weight:700;">₦' + (o.total || 0).toLocaleString() + '</td>' +
+        '<td style="font-size:12px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(o.address || '') + '">' + escapeHtml(o.address || '—') + '</td>' +
+        '<td style="font-size:12px;color:var(--muted);">' + escapeHtml(customerName) + '</td>' +
+        '<td style="font-size:11px;color:var(--muted);">' + new Date(o.created_at).toLocaleString('en-NG') + '</td>' +
+        '</tr>';
     }).join('');
+  }
+
+  // ── ORDER FILTER ──
+  function filterOrders() {
+    const category = document.getElementById('orderCategoryFilter').value;
+    const rows = document.querySelectorAll('#ordersTableBody tr');
+    rows.forEach(row => {
+      if (row.classList.contains('empty-row')) return;
+      const catCell = row.querySelector('td:nth-child(2)');
+      if (!catCell) return;
+      const catText = catCell.textContent.trim().toLowerCase();
+      if (category === 'all' || catText.includes(category)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
   }
 
   // ── CUSTOMERS ──
