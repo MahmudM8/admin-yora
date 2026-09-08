@@ -728,7 +728,7 @@
   function populateBizFilter() {
     const sel = document.getElementById('prodBizFilter');
     const selModal = document.getElementById('prodBusiness');
-    const opts = allBiz.filter(b => b.category === 'restaurant' || b.category === 'pharmacy' || b.category === 'delivery');
+    const opts = allBiz.filter(b => b.category === 'restaurant' || b.category === 'pharmacy' || b.category === 'store' || b.category === 'delivery');
     const html = opts.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
     sel.innerHTML = '<option value="all">All businesses</option>' + html;
     selModal.innerHTML = html;
